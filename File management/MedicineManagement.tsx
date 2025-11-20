@@ -21,36 +21,48 @@ const MedicineManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedMedicine, setSelectedMedicine] = useState<Thuoc | null>(null);
-  // END PART 1
+  const [selectedMedicine, setSelectedMedicine] = useState<Thuoc | null>(null); // thuoc ở đây là interface
 
+  // END PART 1
+  // Part2 UseEffect
+
+  /*Từ khóa async báo hiệu cho JavaScript biết: "Hàm này là một nhiệm vụ bất đồng bộ (có thể phải chờ đợi), hãy sẵn sàng dùng await bên trong nó." */
   const loadMedicines = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await getMedicines();
-      setMedicines(data);
+      const data = await getMedicines(); // await thông báo là dừng chạy code đợi code này chạy xong, lệnh lấy api
+      setMedicines(data); //kích hoạt chế độ render vẽ lại
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setIsLoading(false);
     }
   };
-
+  /*useEffect là tác vụ phụ, có tác dụng giúp trình duyệt không bị đơ khi đang tải dữ liệu.
+   Nó sẽ chờ vẽ các giao diện xong rồi mới thực hiện tác vụ phụ (gọi API), vì vậy nó không gây đứng trang (non-blocking).
+   nó có 2 tham số :
+   + Tham số thứ nhất: HÀNH ĐỘNG (The Action) Thời điểm chạy: Sẽ được React chạy sau khi Component được vẽ lên màn hình (và sau đó là theo quy tắc của Tham số 2).
+   + Tham số thứ hai: ĐIỀU KIỆN KÍCH HOẠT sau khi đã chạy 1 lần  (The Dependency Array) Nhiệm vụ: Quyết định khi nào Tham số 1 được chạy lại. Nó xem cần theo dõi cái nào để chạy cái thứ 1 
+     ,CHú ý nếu để trống không điền  thì sẽ là theo dõi tất cả => có thay đổi lại gọi lại api   */
   useEffect(() => {
     loadMedicines();
   }, []);
 
   const handleOpenModal = (medicine: Thuoc | null) => {
-    setSelectedMedicine(medicine);
+    //nếu là Null thì là mở form thêm mới , nếu là thuoc thì mở form
+    setSelectedMedicine(medicine); // medicine ở đây là med ở bên dưới nhé
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
+    setIsModalOpen(false); // đóng cái modal lại
     setSelectedMedicine(null);
+    /* dọn dẹp dữ liệu giúp Nếu không có dòng này: Lần sau bạn bấm "Thêm thuốc mới", selectedMedicine vẫn còn giữ thông tin của viên thuốc vừa sửa xong
+      -> Form thêm mới lại hiện ra thông tin cũ -> BUG.*/
   };
 
+  // hàm save này để cho thằng con là form dùng
   const handleSave = () => {
     handleCloseModal();
     loadMedicines(); // Tải lại danh sách sau khi lưu
@@ -63,6 +75,16 @@ const MedicineManagement: React.FC = () => {
         loadMedicines(); // Tải lại danh sách
       } catch (err) {
         setError((err as Error).message);
+        /*"Giải thích dòng setError((err as Error).message)!"
+
+       Bạn trả lời: "Dạ thưa thầy, dòng này được dùng để lưu thông báo lỗi vào State của component.
+
+      err là đối tượng lỗi được bắt bởi khối catch.
+
+      (err as Error) là kỹ thuật Ép kiểu của TypeScript (Type Assertion), nó giúp em chắc chắn rằng err là một đối tượng Error, 
+       từ đó em có thể an toàn truy cập vào thuộc tính .message(ở file apithuoc) để lấy nội dung lỗi dưới dạng chuỗi.
+
+      Cuối cùng, em dùng setError() để cập nhật chuỗi lỗi đó vào state error, việc này kích hoạt React vẽ lại giao diện cho người dùng biết */
       }
     }
   };
