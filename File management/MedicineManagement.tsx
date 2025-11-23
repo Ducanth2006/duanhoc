@@ -13,6 +13,8 @@ Nó giống như một cái "giấy chứng nhận": "Tôi xác nhận cái bi�
 Nhờ cái nhãn này, khi bạn dùng component, máy tính sẽ gợi ý cho bạn các thuộc tính có sẵn của React như children, key, ref...
 */
 const MedicineManagement: React.FC = () => {
+  // Khi bạn muốn một dữ liệu nào đó trong ứng dụng của mình thay đổi theo thời gian (ví dụ: số lần click, nội dung nhập vào ô input, trạng thái bật/tắt) VÀ khi dữ liệu đó thay đổi,
+  //   bạn muốn React tự động cập nhật lại giao diện (UI), thì bạn dùng useState
   /* usestate là useState giúp em kích hoạt cơ chế cập nhật giao diện của React mỗi khi dữ liệu thay đổi, đảm bảo người dùng luôn nhìn thấy thông tin mới nhất ạ"
  nó sẽ trả về một mảng gồm 2 phần dữ liệu , method để thay đổi dữ liệu đó*/
   // mới cái trong <.. > là của type script Thưa thầy, đây là Generic trong TypeScript ạ. Em dùng nó để định nghĩa kiểu dữ liệu đầu ra và đầu vào cho state.
@@ -24,7 +26,7 @@ const MedicineManagement: React.FC = () => {
   const [selectedMedicine, setSelectedMedicine] = useState<Thuoc | null>(null); // thuoc ở đây là interface
 
   // END PART 1
-  // Part2 UseEffect
+  // Part2 2. Giao tiếp với Server (API Integration)
 
   /*Từ khóa async báo hiệu cho JavaScript biết: "Hàm này là một nhiệm vụ bất đồng bộ (có thể phải chờ đợi), hãy sẵn sàng dùng await bên trong nó." */
   const loadMedicines = async () => {
@@ -112,15 +114,39 @@ const MedicineManagement: React.FC = () => {
     if (medicines.length === 0) {
       return (
         <tr>
-          <td colSpan={8} className={styles.emptyCell}>
+          { <td colSpan={8} className={styles.emptyCell}> }
+            {/* Dạ, bảng của em có 8 cột tiêu đề. colSpan={8} giúp gộp 8 ô nhỏ thành 1 ô lớn trải dài hết chiều ngang của bảng, 
+            để dòng chữ thông báo hiển thị đẹp ở chính giữa bảng ạ. */}
+          
             Không có dữ liệu thuốc.
           </td>
         </tr>
       );
     }
+{/* "Hàm .map() có nhiệm vụ duyệt qua từng viên thuốc và trả về một Mảng các thẻ <tr>.
+Trong đó:
+Thẻ <tr>: Giúp trình duyệt biết phải tạo một hàng mới (xuống dòng).
+Thuộc tính key: Giúp React định danh hàng đó (để biết khi nào cần thêm, sửa, xóa).
+Các thẻ <td> bên trong: Là nơi hiển thị dữ liệu chi tiết của viên thuốc đó." */}
 
-    return medicines.map((med) => (
-      <tr key={med.MaThuoc}>
+    {/* Hàm .map() trong renderContent trả về cái gì?
+Trả lời: "Dạ nó trả về một mảng mới chứa các thẻ HTML <tr>. Mỗi thẻ <tr> tương ứng với một viên thuốc trong danh sách dữ liệu gốc ạ." */}
+
+    return medicines.map((med) =>{ (
+      {/* Khái niệm: key là một thuộc tính (prop) đặc biệt mà React yêu cầu phải có khi render một danh sách các phần tử. Nó giống như ID định danh cho mỗi phần tử React.
+      Tác dụng: Mục đích chính của nó là giúp React nhận diện phần tử nào đã thay đổi, được thêm vào hay bị xóa đi. Nhờ đó, React tối ưu hóa quá trình cập nhật giao diện (Re-render),
+       chỉ cập nhật đúng chỗ cần thiết thay vì vẽ lại toàn bộ bảng, giúp trang web chạy nhanh và mượt hơn ạ." */}
+      {/* thằng tr key  Mục đích: Đây là ID nội bộ để React theo dõi.
+     React cần biết chính xác dòng này là dòng nào để nếu bạn xóa dòng đó, React chỉ xóa đúng cái <tr> đó khỏi màn hình thôi, không phải vẽ lại cả bảng.
+     Thuộc tính key này KHÔNG hiển thị lên màn hình trình duyệt. Người dùng không thấy nó. */}
+    //  sẽ trả về tất cả dữ liệu dưới đây 
+
+      <tr key={med.MaThuoc}>{/* Quy tắc của React là: Phải gắn thẻ căn cước (key) cho cái "bao bì" ngoài cùng của mỗi phần tử trong danh sách. để 
+      <tr>: Để tạo ra dòng kẻ ngang (nếu không có nó, bảng sẽ nát bét).
+
+      key: Để React phân biệt dòng này với dòng kia. */}
+
+      
         <td>{med.MaThuoc}</td>
         <td>{med.TenThuoc}</td>
         {/* [MỚI] Thêm cột Tên Loại (lấy từ join) */}
@@ -134,21 +160,31 @@ const MedicineManagement: React.FC = () => {
         <td className={styles.actionButtons}>
           <button
             onClick={() => handleOpenModal(med)}
+            /* Dạ nếu viết onClick={handleOpenModal(med)} (không có hàm bao), 
+            thì hàm sẽ chạy ngay lập tức khi trang vừa load (gây lỗi lặp vô tận).
+             Em cần bọc nó trong () => ... để bảo React là: 'Chỉ khi nào người dùng bấm chuột thì mới chạy hàm này' ạ."*/
             className={styles.editButton}
           >
             Sửa
           </button>
         </td>
       </tr>
-    ));
+    );
   };
+{/* End Part2  */}
 
+
+{/* PART 3 Hiển thị Dữ liệu (Data Rendering) và Điều phối Hành động (Event Handling & Orchestration)
+
+ */ }
   return (
     <>
+    {/* Dạ đó là React Fragment. Nó giúp gom nhóm nhiều phần tử con lại để trả về mà không cần sinh thêm một thẻ <div> thừa thãi trong cây DOM của trình duyệt, giúp HTML gọn gàng hơn ạ. */}
       <div className={styles.container}>
         <h1 className={styles.title}>Quản lý Danh sách thuốc</h1>
         <button
-          onClick={() => handleOpenModal(null)}
+          onClick={() => handleOpenModal(null)}// nếu viết onClick={handleOpenModal(med)} thiếu () thì hàm sẽ tự chạy khi load lại ,
+          // bọc nó () để Chỉ khi nào người dùng bấm chuột thì mới chạy hàm này' ạ  
           className={styles.addButton}
         >
           Thêm thuốc mới
@@ -169,15 +205,39 @@ const MedicineManagement: React.FC = () => {
             </tr>
           </thead>
           <tbody>{renderContent()}</tbody>
+          {/* Dạ, dấu ngoặc nhọn {} cho phép nhúng biểu thức JavaScript vào JSX. Ở đây em gọi hàm renderContent() để lấy kết quả trả về (là return [
+          <tr key="1">Thuốc A</tr>,
+          <tr key="2">Thuốc B</tr>,
+          <tr key="3">Thuốc C</tr>];
+          sau đó Quy tắc của React là: Nếu bạn đặt một Mảng các thẻ HTML vào trong {JSX}, React sẽ tự động "gỡ bỏ" cái vỏ mảng và xếp từng phần tử ruột ra bàn.
+          <tbody> [
+          <tr key="1">Thuốc A</tr>,
+          <tr key="2">Thuốc B</tr>,
+          <tr key="3">Thuốc C</tr>];</tbody>
+          và cuối cùng là sẽ bỏ dấu []
+          <tbody>
+                <tr>...Thuốc A...</tr>
+                <tr>...Thuốc B...</tr>
+                <tr>...Thuốc C...</tr>
+          </tbody>
+          chú ý ở trong bài sẽ trả về tr và td bọc ở trong nhé 
+     
+) 
+          và hiển thị chúng vào phần thân của bảng ạ." */}
         </table>
       </div>
-
+      {/* Mở Form (handleOpenModal): Phân biệt thông minh giữa hành động Thêm và Sửa. */}
       {/* Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         title={selectedMedicine ? "Sửa thông tin thuốc" : "Thêm thuốc mới"}
+        // Dạ đây là Toán tử 3 ngôi (Ternary Operator). Em dùng nó để tạo tiêu đề động cho Modal.Nếu selectedMedicine có dữ liệu (Truthy)
+        //   Tiêu đề là 'Sửa'.Ngược lại (Falsy/Null) Tiêu đề là 'Thêm'.Giúp em tái sử dụng 1 Modal cho cả 2 chức năng."
       >
+        {/* Props onSave={handleSave} truyền xuống MedicineForm hoạt động theo cơ chế nào? Dạ đây là cơ chế Callback. Em truyền hàm handleSave của cha xuống cho con.
+         Khi con lưu xong, con sẽ 'gọi điện' (invoke) hàm này. 
+        Nhờ đó, cha biết để thực hiện hành động tiếp theo là đóng form và tải lại danh sách ạ." */}
         <MedicineForm
           medicine={selectedMedicine}
           onSave={handleSave}
@@ -186,6 +246,7 @@ const MedicineManagement: React.FC = () => {
       </Modal>
     </>
   );
+  {/* kết thúc jsx */}
 };
 
 export default MedicineManagement;
