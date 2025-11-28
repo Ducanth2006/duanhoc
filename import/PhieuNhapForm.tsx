@@ -1,324 +1,297 @@
-// --- IMPORT (NHẬP NGUYÊN LIỆU) ---
-import React, { useState, useEffect } from "react";
-// Nhập các khuôn mẫu dữ liệu (Interface)
-import {
-  Thuoc,
-  NhaCungCap,
-  ChiTietNhapCreate,
-  PhieuNhapCreatePayload,
-} from "../../interfaces";
-// Nhập các hàm gọi API (Lấy danh sách thuốc, nhà cung cấp, lưu phiếu)
-import { getNhaCungCapList } from "../../api/nhaCungCapApi";
-import { getMedicines } from "../../api/thuocApi";
-import { addPhieuNhap } from "../../api/phieuNhapApi";
+// src/components/AdminForms/PhieuNhapForm.tsx
+import React, { useState, useEffect } from 'react';
+import { Thuoc, NhaCungCap, ChiTietNhapCreate, PhieuNhapCreatePayload } from '../../interfaces';
+import { getNhaCungCapList } from '../../api/nhaCungCapApi';
+import { getMedicines } from '../../api/thuocApi';
+import { addPhieuNhap } from '../../api/phieuNhapApi';
 
-// Nhập CSS để trang trí
-import styles from "../../styles/PhieuNhapForm.module.css";
+import styles from '../../styles/PhieuNhapForm.module.css';
 
-// Định nghĩa Props: Form này nhận 2 lệnh từ cha:
-// 1. onClose: Ra lệnh đóng form.
-// 2. onSave: Báo cho cha biết là "tôi lưu xong rồi".
 interface PhieuNhapFormProps {
   onClose: () => void;
   onSave: () => void;
 }
 
-// Hàm nhỏ lấy ngày hôm nay dạng "2023-10-25" để điền sẵn vào ô ngày nhập
-const getTodayString = () => new Date().toISOString().split("T")[0];
+const getTodayString = () => new Date().toISOString().split('T')[0];
 
-// --- BẮT ĐẦU COMPONENT ---
-export const PhieuNhapForm: React.FC<PhieuNhapFormProps> = ({
-  onClose,
-  onSave,
-}) => {
-  // --- 1. KHAI BÁO STATE (BỘ NHỚ) ---
-
-  // Danh sách nhà cung cấp để đổ vào ô chọn (Dropdown)
+export const PhieuNhapForm: React.FC<PhieuNhapFormProps> = ({ onClose, onSave }) => {
+  
+  // --- STATE QUẢN LÝ DỮ LIỆU TỪ API ---
   const [nhaCungCapList, setNhaCungCapList] = useState<NhaCungCap[]>([]);
-
-  // Danh sách thuốc (Kho thuốc) để đổ vào ô chọn tên thuốc
-  const [allMedicines, setAllMedicines] = useState<Thuoc[]>([]);
-  const [filteredMedicines, setFilteredMedicines] = useState<Thuoc[]>([]); // danh sách dữ liệu tạm thời
-  // Nó giúp bạn thực hiện chức năng tìm kiếm/lọc (Filter) cực nhanh ngay trên trình duyệt mà không làm mất dữ liệu gốc đã tải về
-
-  // Lưu xem người dùng đang chọn Nhà cung cấp nào (Lưu ID)
-  const [selectedNCC, setSelectedNCC] = useState<string>("");
-
-  // Lưu ngày nhập, mặc định là hôm nay
-  const [ngayNhap, setNgayNhap] = useState(getTodayString());
-
-  // QUAN TRỌNG NHẤT: Mảng chứa các dòng thuốc chi tiết
-  // Mỗi phần tử là một dòng trên bảng (Tên thuốc, số lượng, giá...)
-  const [chiTietRows, setChiTietRows] = useState<ChiTietNhapCreate[]>([
-    // Mặc định khi mở form có sẵn 1 dòng trống
-    { MaThuoc: 0, SoLuongNhap: 1, DonGiaNhap: 0, HanSuDung: "" },
-  ]);
-
-  // State xử lý lỗi và trạng thái đang lưu
-  const [error, setError] = useState<string | null>(null);
+  // [SỬA 1] Thêm 2 state để quản lý việc lọc thuốc
+  const [allMedicines, setAllMedicines] = useState<Thuoc[]>([]); // Danh sách TẤT CẢ thuốc
+  const [filteredMedicines, setFilteredMedicines] = useState<Thuoc[]>([]); // Danh sách ĐÃ LỌC
+  
+  const [maNhanVien, setMaNhanVien] = useState<string>('');
+  
+  // --- STATE QUẢN LÝ FORM ---
+  const [selectedNCC, setSelectedNCC] = useState<string>(''); // Lưu MaNhaCungCap
+  const [chiTietRows, setChiTietRows] = useState<Partial<ChiTietNhapCreate>[]>([]);
+  
+  // --- STATE QUẢN LÝ TRẠNG THÁI UI ---
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // --- 2. LẤY DỮ LIỆU KHI MỞ FORM ---
+  // --- 1. TẢI DỮ LIỆU BAN ĐẦU ---
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const loadInitialData = async () => {
       try {
-        // Chạy song song 2 lệnh lấy danh sách NCC và Thuốc cùng lúc cho nhanh
-        const [nccData, medicinesData] = await Promise.all([
+        setIsLoading(true);
+        // TODO: Thay thế bằng AuthContext hoặc cách lấy user đang đăng nhập
+        const currentMaNV = localStorage.getItem('maNhanVien'); 
+        if (!currentMaNV) {
+          throw new Error('Không tìm thấy Mã Nhân Viên. Vui lòng đăng nhập lại.');
+        }
+        setMaNhanVien(currentMaNV);
+
+        // Gọi API lấy NCC và Thuốc
+        const [nccData, thuocData] = await Promise.all([
           getNhaCungCapList(),
-          getMedicines(),
+          getMedicines() // API này giờ đã trả về MaNhaCungCap
         ]);
-
+        
         setNhaCungCapList(nccData);
-        setAllMedicines(medicinesData);
+        setAllMedicines(thuocData); // [SỬA 2] Lưu vào danh sách tổng
+        
+        // Tự động chọn NCC đầu tiên (nếu có)
+        if (nccData.length > 0) {
+          setSelectedNCC(nccData[0].MaNhaCungCap);
+        }
 
-        // Ban đầu lọc thuốc rỗng (hoặc có thể hiện tất cả tùy logic)
-        setFilteredMedicines(medicinesData);
       } catch (err) {
-        setError("Không thể tải danh sách thuốc hoặc nhà cung cấp.");
+        setError((err as Error).message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchInitialData();
-  }, []); // Chạy 1 lần duy nhất
-  // --- 3. XỬ LÝ KHI NGƯỜI DÙNG THAY ĐỔI DỮ LIỆU ---
+    loadInitialData();
+  }, []); // Chỉ chạy 1 lần
 
-  // Khi chọn Nhà cung cấp
-  const handleNCCChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nccId = e.target.value;
-    setSelectedNCC(nccId);
+  // --- 2. [MỚI] LOGIC LỌC THUỐC ---
+  // Effect này sẽ chạy mỗi khi 'selectedNCC' (nhà cung cấp) hoặc 'allMedicines' (danh sách tổng) thay đổi
+  useEffect(() => {
+    if (selectedNCC) {
+      // 1. Lọc danh sách thuốc
+      const filtered = allMedicines.filter(
+        (thuoc) => thuoc.MaNhaCungCap === selectedNCC
+      );
+      setFilteredMedicines(filtered);
 
-    // Logic lọc: Nếu bạn muốn khi chọn NCC A chỉ hiện thuốc của NCC A (ở đây đang hiện tất cả)
-    if (!nccId) {
-      setFilteredMedicines(allMedicines);
+      // 2. [QUAN TRỌNG] Reset lại các hàng chi tiết
+      // Vì đã đổi NCC, các thuốc cũ (nếu có) không còn hợp lệ
+      setChiTietRows([
+        { // Thêm 1 hàng trống cho nhà cung cấp mới
+          MaThuoc: '',
+          SoLuongNhap: 1,
+          DonGiaNhap: 0,
+          HanSuDung: getTodayString()
+        }
+      ]);
+      
     } else {
-      // Có thể thêm logic lọc thuốc theo NCC ở đây nếu cần
-      setFilteredMedicines(allMedicines);
+      // Nếu không có NCC nào được chọn, làm trống danh sách
+      setFilteredMedicines([]);
+      setChiTietRows([]);
     }
-  };
+  }, [selectedNCC, allMedicines]); // Phụ thuộc vào 2 state này
 
-  // QUAN TRỌNG: Xử lý thay đổi trong từng dòng thuốc (Thay đổi số lượng, giá, tên thuốc...)
-  // index: Dòng thứ mấy đang bị sửa?
-  // field: Đang sửa cột nào? (SoLuongNhap, DonGiaNhap...)
-  // value: Giá trị mới là gì?
-  // Tác dụng 1: Giúp ô nhập liệu "sống", cho phép người dùng nhìn thấy những gì họ đang gõ.
 
-  const handleRowChange = (
-    index: number,
-    field: keyof ChiTietNhapCreate,
-    value: any
-  ) => {
-    // 1. Copy danh sách cũ ra một mảng mới (nguyên tắc bất biến trong React)
-    // Quy tắc vàng của React (Immutability - Bất biến):
-    // Bạn KHÔNG ĐƯỢC PHÉP lấy bút tẩy xóa trực tiếp lên dữ liệu cũ. Muốn sửa gì, bạn phải PHOTOCOPY ra một bản mới, sửa trên bản photocopy đó, rồi nộp bản mới cho React.
-    const newRows = [...chiTietRows];
+  // --- 3. HÀM XỬ LÝ BẢNG CHI TIẾT ĐỘNG ---
 
-    // 2. Cập nhật giá trị tại dòng (index) và cột (field) tương ứng
-    newRows[index] = {
-      ...newRows[index], // Giữ lại các thông tin cũ của dòng đó
-      [field]: value, // Ghi đè thông tin mới vào
-    };
-
-    // 3. Lưu mảng mới vào State -> Giao diện tự cập nhật
-    setChiTietRows(newRows);
-  };
-
-  // Thêm một dòng trống mới vào cuối bảng
+  // Thêm một hàng mới (cho cùng NCC)
   const handleAddRow = () => {
     setChiTietRows([
-      ...chiTietRows, // Lấy toàn bộ dòng cũ
-      { MaThuoc: 0, SoLuongNhap: 1, DonGiaNhap: 0, HanSuDung: "" }, // Thêm dòng mới
+      ...chiTietRows,
+      {
+        MaThuoc: '',
+        SoLuongNhap: 1,
+        DonGiaNhap: 0,
+        HanSuDung: getTodayString()
+      }
     ]);
   };
 
-  // Xóa một dòng khỏi bảng
-  const handleRemoveRow = (index: number) => {
-    // Chỉ giữ lại những dòng có vị trí KHÁC với index cần xóa
-    const newRows = chiTietRows.filter((_, i) => i !== index);
+  // Xóa một hàng khỏi bảng
+  const handleRemoveRow = (indexToRemove: number) => {
+    setChiTietRows(chiTietRows.filter((_, index) => index !== indexToRemove));
+  };
+
+  // Cập nhật dữ liệu khi người dùng nhập vào 1 ô trong bảng
+  const handleRowChange = (index: number, field: keyof ChiTietNhapCreate, value: string | number) => {
+    const newRows = [...chiTietRows];
+    
+    if (field === 'SoLuongNhap' || field === 'DonGiaNhap') {
+      newRows[index][field] = Number(value);
+    } else {
+      newRows[index][field] = String(value);
+    }
+    
     setChiTietRows(newRows);
   };
 
-  // --- 4. XỬ LÝ LƯU (SUBMIT) ---
+  // --- 4. HÀM SUBMIT FORM ---
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Chặn việc reload lại trang web mặc định
+    e.preventDefault();
+    setError(null);
 
-    // --- Kiểm tra dữ liệu (Validate) ---
+    // --- Validate (Kiểm tra) ---
     if (!selectedNCC) {
-      setError("Vui lòng chọn nhà cung cấp!");
+      setError('Vui lòng chọn một nhà cung cấp.');
       return;
     }
-
-    // Kiểm tra từng dòng thuốc xem có hợp lệ không
-    for (let i = 0; i < chiTietRows.length; i++) {
-      const row = chiTietRows[i];
-      if (row.MaThuoc === 0) {
-        setError(`Dòng thứ ${i + 1}: Chưa chọn thuốc!`);
+    // ... (các validate khác giữ nguyên) ...
+    const validChiTiet: ChiTietNhapCreate[] = [];
+    for (const row of chiTietRows) {
+      if (!row.MaThuoc) {
+        setError('Vui lòng chọn thuốc cho tất cả các dòng.');
         return;
       }
-      if (row.SoLuongNhap <= 0) {
-        setError(`Dòng thứ ${i + 1}: Số lượng phải lớn hơn 0!`);
+      if (!row.SoLuongNhap || row.SoLuongNhap <= 0) {
+        setError(`Số lượng nhập cho thuốc phải lớn hơn 0.`);
         return;
       }
-      if (row.DonGiaNhap < 0) {
-        setError(`Dòng thứ ${i + 1}: Đơn giá không được âm!`);
+       if (row.DonGiaNhap === undefined || row.DonGiaNhap < 0) {
+        setError(`Đơn giá nhập không được âm.`);
         return;
       }
       if (!row.HanSuDung) {
-        setError(`Dòng thứ ${i + 1}: Chưa nhập hạn sử dụng!`);
+        setError(`Vui lòng nhập Hạn sử dụng.`);
         return;
       }
+      validChiTiet.push(row as ChiTietNhapCreate);
     }
 
-    // --- Gửi dữ liệu đi ---
-    setIsSubmitting(true); // Bật trạng thái "Đang lưu..."
-    setError(null);
-
-    // Chuẩn bị gói hàng (payload) đúng mẫu Backend yêu cầu
+    // --- Gửi Payload ---
     const payload: PhieuNhapCreatePayload = {
-      MaNhaCungCap: parseInt(selectedNCC),
-      NgayNhap: new Date(ngayNhap).toISOString(),
-      ChiTiet: chiTietRows.map((row) => ({
-        MaThuoc: Number(row.MaThuoc),
-        SoLuongNhap: Number(row.SoLuongNhap),
-        DonGiaNhap: Number(row.DonGiaNhap),
-        HanSuDung: new Date(row.HanSuDung).toISOString(), // Đổi định dạng ngày
-      })),
+      MaNhaCungCap: selectedNCC,
+      MaNhanVien: maNhanVien,
+      chiTiet: validChiTiet
     };
 
+    setIsSubmitting(true);
     try {
-      await addPhieuNhap(payload); // Gọi người đưa thư (API)
-      alert("Nhập hàng thành công!");
-      onSave(); // Báo cho cha biết để tải lại bảng
-      onClose(); // Đóng form
+      await addPhieuNhap(payload);
+      alert('Thêm phiếu nhập thành công!');
+      onSave(); 
+      onClose(); 
     } catch (err) {
-      setError((err as Error).message || "Có lỗi xảy ra khi lưu.");
+      setError((err as Error).message);
     } finally {
-      setIsSubmitting(false); // Tắt trạng thái đang lưu
+      setIsSubmitting(false);
     }
   };
+
+  // --- RENDER ---
+  if (isLoading) return <div>Đang tải dữ liệu...</div>;
+  if (error && !isSubmitting) return <div className={styles.errorText}>Lỗi: {error}</div>;
+
   return (
-    <form onSubmit={handleSubmit} className={styles.formContainer}>
-      {/* Hàng 1: Chọn Nhà cung cấp và Ngày nhập */}
-      <div className={styles.topControls}>
+    <form onSubmit={handleSubmit} className={styles.form}>
+      {/* Hàng 1: Thông tin chung */}
+      <div className={styles.formGrid}>
         <div className={styles.formGroup}>
-          <label>Nhà Cung Cấp:</label>
+          <label htmlFor="MaNhaCungCap">Nhà Cung Cấp *</label>
           <select
+            id="MaNhaCungCap"
+            name="MaNhaCungCap"
             value={selectedNCC}
-            onChange={handleNCCChange}
-            className={styles.selectInput}
+            onChange={(e) => setSelectedNCC(e.target.value)} // <-- Khi đổi NCC, effect lọc sẽ chạy
             required
           >
-            <option value="">-- Chọn Nhà Cung Cấp --</option>
-            {/* Duyệt danh sách NCC để tạo các option */}
-            {nhaCungCapList.map((ncc) => (
+            {nhaCungCapList.length === 0 && <option disabled>Không có nhà cung cấp</option>}
+            {nhaCungCapList.map(ncc => (
               <option key={ncc.MaNhaCungCap} value={ncc.MaNhaCungCap}>
                 {ncc.TenNhaCungCap}
               </option>
             ))}
           </select>
         </div>
-
+        
         <div className={styles.formGroup}>
-          <label>Ngày Nhập:</label>
+          <label htmlFor="MaNhanVien">Nhân Viên Nhập</label>
           <input
-            type="date"
-            value={ngayNhap}
-            onChange={(e) => setNgayNhap(e.target.value)}
-            className={styles.dateInput}
-            required
+            type="text"
+            id="MaNhanVien"
+            name="MaNhanVien"
+            value={maNhanVien}
+            disabled
+            className={styles.disabledInput}
           />
         </div>
       </div>
 
-      {/* Bảng chi tiết thuốc */}
-      <table className={styles.detailTable}>
+      {/* Hàng 2: Bảng chi tiết thuốc */}
+      <h3 className={styles.tableTitle}>Chi Tiết Thuốc</h3>
+      <table className={styles.chiTietTable}>
         <thead>
           <tr>
-            <th>Tên Thuốc</th>
-            <th>Số Lượng</th>
-            <th>Đơn Giá</th>
-            <th>Thành Tiền</th> {/* Cột tự tính */}
-            <th>Hạn Sử Dụng</th>
-            <th>Hành Động</th>
+            <th>Thuốc *</th>
+            <th>Số Lượng *</th>
+            <th>Đơn Giá Nhập *</th>
+            <th>Hạn Sử Dụng *</th>
+            <th>Xóa</th>
           </tr>
         </thead>
         <tbody>
-          {/* VÒNG LẶP QUAN TRỌNG: Vẽ từng dòng thuốc */}
-          {/* map row là Giá trị của phần tử hiện tại đang được xử lý và index */}
           {chiTietRows.map((row, index) => (
             <tr key={index}>
-              {/* Cột 1: Chọn tên thuốc */}
+              {/* [SỬA 3] Ô chọn thuốc giờ sẽ dùng 'filteredMedicines' */}
               <td>
                 <select
+                  name="MaThuoc"
                   value={row.MaThuoc}
-                  // Khi chọn thuốc khác -> Gọi hàm sửa dòng (index), sửa cột MaThuoc
-                  onChange={(e) =>
-                    handleRowChange(index, "MaThuoc", e.target.value)
-                  }
-                  className={styles.tableSelect}
+                  onChange={(e) => handleRowChange(index, 'MaThuoc', e.target.value)}
                   required
                 >
-                  <option value={0}>-- Chọn thuốc --</option>
-                  {filteredMedicines.map((t) => (
-                    <option key={t.MaThuoc} value={t.MaThuoc}>
-                      {t.TenThuoc} ({t.DonViTinh})
+                  <option value="" disabled>-- Chọn thuốc --</option>
+                  {filteredMedicines.length === 0 && selectedNCC && (
+                    <option disabled>Không có thuốc cho NCC này</option>
+                  )}
+                  {filteredMedicines.map(thuoc => (
+                    <option key={thuoc.MaThuoc} value={thuoc.MaThuoc}>
+                      {thuoc.TenThuoc} ({thuoc.DonViTinh})
                     </option>
                   ))}
                 </select>
               </td>
-
-              {/* Cột 2: Nhập số lượng */}
+              {/* Các ô khác giữ nguyên */}
               <td>
                 <input
                   type="number"
-                  min="1"
+                  name="SoLuongNhap"
                   value={row.SoLuongNhap}
-                  onChange={(e) =>
-                    handleRowChange(index, "SoLuongNhap", e.target.value)
-                  }
-                  className={styles.tableInput}
+                  onChange={(e) => handleRowChange(index, 'SoLuongNhap', e.target.value)}
+                  min="1"
                   required
                 />
               </td>
-
-              {/* Cột 3: Nhập đơn giá */}
               <td>
                 <input
                   type="number"
-                  min="0"
+                  name="DonGiaNhap"
                   value={row.DonGiaNhap}
-                  onChange={(e) =>
-                    handleRowChange(index, "DonGiaNhap", e.target.value)
-                  }
-                  className={styles.tableInput}
+                  onChange={(e) => handleRowChange(index, 'DonGiaNhap', e.target.value)}
+                  min="0"
                   required
                 />
               </td>
-
-              {/* Cột 4: Thành tiền (Chỉ hiển thị, không sửa được) */}
-              <td className={styles.totalCell}>
-                {/* Công thức: Số lượng * Đơn giá */}
-                {(row.SoLuongNhap * row.DonGiaNhap).toLocaleString("vi-VN")} đ
-              </td>
-
-              {/* Cột 5: Hạn sử dụng */}
               <td>
                 <input
                   type="date"
+                  name="HanSuDung"
                   value={row.HanSuDung}
-                  onChange={(e) =>
-                    handleRowChange(index, "HanSuDung", e.target.value)
-                  }
+                  onChange={(e) => handleRowChange(index, 'HanSuDung', e.target.value)}
                   required
                 />
               </td>
-
-              {/* Cột 6: Nút xóa dòng */}
               <td>
                 <button
-                  type="button" // Phải là type button để không kích hoạt submit form
+                  type="button"
                   onClick={() => handleRemoveRow(index)}
                   className={styles.removeRowButton}
-                  disabled={chiTietRows.length <= 1} // Không cho xóa dòng cuối cùng
+                  disabled={chiTietRows.length <= 1} // Không cho xóa nếu chỉ còn 1 hàng
                 >
                   X
                 </button>
@@ -327,31 +300,30 @@ export const PhieuNhapForm: React.FC<PhieuNhapFormProps> = ({
           ))}
         </tbody>
       </table>
-
-      {/* Nút thêm dòng mới */}
-      <button
-        type="button"
-        onClick={handleAddRow}
+      
+      {/* Nút thêm hàng */}
+      <button 
+        type="button" 
+        onClick={handleAddRow} 
         className={styles.addRowButton}
-        disabled={!selectedNCC} // Phải chọn NCC trước mới cho thêm thuốc
+        disabled={!selectedNCC} // Vô hiệu hóa nếu chưa chọn NCC
       >
         + Thêm Thuốc
       </button>
 
-      {/* Thông báo lỗi nếu có */}
-      {error && <div className={styles.errorText}>{error}</div>}
+      {/* Hàng 3: Nút Submit và Lỗi */}
+      {error && (
+        <div className={styles.errorText}>
+          {error}
+        </div>
+      )}
 
-      {/* Các nút Lưu/Hủy */}
       <div className={styles.buttonGroup}>
-        <button
-          type="submit"
-          className={styles.saveButton}
-          disabled={isSubmitting} // Khi đang lưu thì khóa nút lại
-        >
-          {isSubmitting ? "Đang lưu..." : "Lưu Phiếu Nhập"}
+        <button type="submit" className={styles.saveButton} disabled={isSubmitting}>
+          {isSubmitting ? 'Đang lưu...' : 'Lưu Phiếu Nhập'}
         </button>
         <button type="button" className={styles.cancelButton} onClick={onClose}>
-          Hủy Bỏ
+          Hủy
         </button>
       </div>
     </form>
