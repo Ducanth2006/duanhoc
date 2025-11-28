@@ -85,7 +85,7 @@ export const MedicineForm: React.FC<MedicineFormProps> = ({
     };
     fetchData();
   }, []); // [] đảm bảo chỉ chạy 1 lần
-
+// hàm xử lý ô chữ khi điền form .Chạy mỗi khi bạn gõ 1 ký tự vào bất kỳ ô nào Nếu thiếu onchange or hàm này thì, ô input sẽ bị "đơ", không gõ được gì cả.
   const handleChange = () =>
       e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>// Khái niệm: Khi bạn gõ một phím hoặc chọn một dòng trong dropdown, trình duyệt sẽ tạo ra một Sự kiện (Event).
     // Biến e: Là gói tin chứa toàn bộ thông tin về hành động đó.
